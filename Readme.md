@@ -107,11 +107,13 @@ avg_seq_len = np.random.randint(
 | 500  | 452.62 | 343.89 | 1.33 | 250.78 | 1.80 |
 
 ## Run demo
-`TF_PATH : path to libtensorflow_framework.so`
+
+Using python prebuilt packege requires python3.5+ tensorflow1.15.x cuda10.0, tested on debian9.
+
 ```
-$ mkdir build && cd build
-$ cmake -DTF_PATH=/your/path/to/pythonx.x/site-packages/tensorflow_core/ ..
-$ make
+$ cd effective_transformer
+$ pip install -e python
+
 $ python benchmark.py --help
 usage: benchmark.py [-h] [-c CONFIG] [-p {fp32,fp16}] [-b BATCH_SIZE]
                     [-m MAX_SEQ_LENGTH] [-a AVG_SEQ_LENGTH]
@@ -130,4 +132,13 @@ optional arguments:
                         Max sequence length.
   -a AVG_SEQ_LENGTH, --avg_seq_length AVG_SEQ_LENGTH
                         Average sequence length.
+```
+
+## Build from source
+`TF_PATH : path to libtensorflow_framework.so`
+```
+$ mkdir build && cd build
+$ cmake -DTF_PATH=/your/path/to/pythonx.x/site-packages/tensorflow_core/ ..
+$ make
+$ cp lib/libtf_effectivetransformer.so ../python/effective_transformer/libtf_effectivetransformer.so.1.15
 ```

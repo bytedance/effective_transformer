@@ -1,0 +1,9 @@
+MANIFEST.in
+setup.py
+effective_transformer/__init__.py
+effective_transformer/libtf_effectivetransformer.so.1.15
+effective_transformer.egg-info/PKG-INFO
+effective_transformer.egg-info/SOURCES.txt
+effective_transformer.egg-info/dependency_links.txt
+effective_transformer.egg-info/requires.txt
+effective_transformer.egg-info/top_level.txt

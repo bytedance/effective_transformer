@@ -108,7 +108,7 @@ avg_seq_len = np.random.randint(
 
 ## Run demo
 
-Using python prebuilt packege requires python3.5+ tensorflow1.15.x cuda10.0
+Using python prebuilt packege requires python3.5+ tensorflow1.15.x cuda10.0, tested on debian9.
 
 ```
 $ cd effective_transformer

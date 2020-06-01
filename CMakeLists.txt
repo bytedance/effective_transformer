@@ -26,7 +26,7 @@ if(NOT TF_PATH)
 endif()
 message(STATUS "TF_PATH      : " ${TF_PATH})
 
-list(APPEND COMMON_LIB_DIRS 
+list(APPEND COMMON_LIB_DIRS
   ${CUDA_PATH}/lib64
   ${TF_PATH}/
 )
@@ -34,7 +34,7 @@ foreach(lib ${COMMON_LIB_DIRS})
   message(STATUS "lib path     : " ${lib})
 endforeach()
 
-list(APPEND COMMON_HEADER_DIRS 
+list(APPEND COMMON_HEADER_DIRS
   ${PROJECT_SOURCE_DIR}
   ${CUDA_PATH}/include
   ${TF_PATH}/include
@@ -84,7 +84,6 @@ add_subdirectory(tf_op)
 add_custom_target(copy ALL COMMENT "Copying tensorflow sample")
 add_custom_command(TARGET copy
     POST_BUILD
-    COMMAND cp ${PROJECT_SOURCE_DIR}/sample/tensorflow/effective_transformer.py ${PROJECT_SOURCE_DIR}/build/
     COMMAND cp ${PROJECT_SOURCE_DIR}/sample/tensorflow/bert_config.json ${PROJECT_SOURCE_DIR}/build/
     COMMAND cp ${PROJECT_SOURCE_DIR}/sample/tensorflow/benchmark.py ${PROJECT_SOURCE_DIR}/build/
     COMMAND cp ${PROJECT_SOURCE_DIR}/sample/tensorflow/modeling.py ${PROJECT_SOURCE_DIR}/build/

@@ -5,6 +5,7 @@
 @Time       : 2020/6/1 12:28
 @Description:
 """
+from datetime import datetime
 import argparse
 import numpy as np
 import os
@@ -113,6 +114,7 @@ def main(args):
         input_mask_tensor = tf.convert_to_tensor(input_mask, dtype=tf.int32)
 
         # predict
+        begin = datetime.now()
         input_embedding, embedding_table = sess.run(
             [embedding_layer.get_embedding_output(), embedding_layer.get_embedding_table()],
             feed_dict={input_ids_placeholder: input_ids})
@@ -124,6 +126,8 @@ def main(args):
         probs = sess.run(output_layer.get_predict_probs(),
                          feed_dict={transformer_output_placeholder: transformer_output,
                                     embedding_table_placeholder: embedding_table})
+        end = datetime.now()
+        print("time cost: ", (end - begin).total_seconds(), "s")
 
         # choose top k answers
         k = 5

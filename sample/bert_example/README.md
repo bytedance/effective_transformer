@@ -64,12 +64,21 @@ pip install tensorflow-bert
 ```
 Then, run the task:
 ```
-python run_cloze_task.py -d bert_model_path
+python run_cloze_task_effective.py -d bert_model_path
 ```
 The output should be like:
 ```
+time cost:  2.987051 s
 Q: What a _ day !
 A: [('beautiful', 0.22004957), ('wonderful', 0.18434832), ('lovely', 0.12934665), ('great', 0.084521234), ('nice', 0.053840164)]
 Q: Effective transformer is _ fast !
 A: [('very', 0.2847082), ('so', 0.12541212), ('too', 0.12115073), ('extremely', 0.04300181), ('not', 0.031808525)]
 ```
+compared to the output of original BERT:
+```
+time cost:  7.224578 s
+Q: What a _ day !
+A: [('beautiful', 0.22005162), ('wonderful', 0.18434829), ('lovely', 0.12934624), ('great', 0.08452097), ('nice', 0.053839635)]
+Q: Effective transformer is _ fast !
+A: [('very', 0.28470847), ('so', 0.12541331), ('too', 0.121151075), ('extremely', 0.043001525), ('not', 0.03180822)]
+```  

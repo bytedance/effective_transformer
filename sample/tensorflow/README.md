@@ -53,17 +53,17 @@ Now, the whole model with effective transformer is created.
 
 ## Run and enjoy the speed!
 Install `effective_transformer` package by:
-```
+```bash
 git clone https://github.com/bytedance/effective_transformer.git
 cd effective_transformer/python
 python setup.py install
 ```
 We also use `tensorflow-bert` package in the code, so:
-```
+```bash
 pip install tensorflow-bert
 ```
 Then, run the task:
-```
+```bash
 python run_cloze_task_effective.py -d bert_model_path
 ```
 The output should be like:
@@ -82,3 +82,16 @@ A: [('beautiful', 0.22005162), ('wonderful', 0.18434829), ('lovely', 0.12934624)
 Q: Effective transformer is _ fast !
 A: [('very', 0.28470847), ('so', 0.12541331), ('too', 0.121151075), ('extremely', 0.043001525), ('not', 0.03180822)]
 ```  
+
+## Benchmark
+To reproduce the [benchmark](https://github.com/bytedance/effective_transformer#Performance) presented in repo home page, run
+```bash
+python benchmark.py -p fp32
+```
+The output should be like:
+```
+Valid word num : 2502/4096, avg sequence length : 19.5469 
+max diff : 6.67572e-06, avg diff : 4.02369e-06.
+xla cost : 95.0982 ms
+et  cost : 57.7004 ms
+```

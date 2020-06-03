@@ -14,7 +14,7 @@
 
 from datetime import datetime
 import argparse
-import modeling
+from bert import modeling
 import numpy as np
 import os
 import tensorflow as tf

@@ -5,7 +5,7 @@ We take [cloze task](https://en.wikipedia.org/wiki/Cloze_test) using Google's of
 A typical BERT model can be split into 3 parts: `EmbeddingLayer`, `TransformerLayer` and `TaskOutputLayer`.   
 What we want to do here is building an `EffectiveTransformerLayer` to replace the original `TransformerLayer` so that the model can be served super fast.  
   
-<div align=center><img src="./effective_transfmer_bert_example.png"></div>  
+<div align=center><img src="../../images/effective_transfmer_bert_example.png"></div>  
 
 
   
@@ -64,7 +64,7 @@ pip install tensorflow-bert
 ```
 Then, run the task:
 ```bash
-python run_cloze_task_effective.py -d bert_model_path
+python run_cloze_task.py -d bert_model_path --effective_mode
 ```
 The output should be like:
 ```

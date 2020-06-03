@@ -80,8 +80,9 @@ def main(args):
     max_seq_len = args.max_seq_length
     tf_dtype = tf.float16 if args.precision == 'fp16' else tf.float32
 
-    # load transformer weights *before* building the computation graph
-    weights_value = load_transformer_weights(checkpoint_path, bert_config, batch_size, max_seq_len, tf_dtype)
+    if args.effective_mode:
+        # load transformer weights *before* building the computation graph
+        weights_value = load_transformer_weights(checkpoint_path, bert_config, batch_size, max_seq_len, tf_dtype)
 
     # build model
     input_ids_placeholder = tf.placeholder(shape=[batch_size, max_seq_len], dtype=tf.int32, name="input_ids")
@@ -92,9 +93,12 @@ def main(args):
     transformer_output_placeholder = tf.placeholder(shape=[batch_size, max_seq_len, bert_config.hidden_size], dtype=tf_dtype, name="transformer_output")
 
     embedding_layer = EmbeddingLayer(bert_config, input_ids_placeholder)
-    effective_transformer_layer = EffectiveTransformerLayer(batch_size, max_seq_len, bert_config,
-                                                            attention_mask_placeholder, input_mask_placeholder,
-                                                            input_embedding_placeholder, weights_value)
+    if args.effective_mode:
+        effective_transformer_layer = EffectiveTransformerLayer(batch_size, max_seq_len, bert_config,
+                                                                attention_mask_placeholder, input_mask_placeholder,
+                                                                input_embedding_placeholder, weights_value)
+    else:
+        standard_transformer_layer = TransformerLayer(bert_config, input_embedding_placeholder, input_mask_placeholder)
     output_layer = LanguageModelOutputLayer(bert_config, transformer_output_placeholder, embedding_table_placeholder)
 
     # model saver
@@ -119,10 +123,16 @@ def main(args):
             [embedding_layer.get_embedding_output(), embedding_layer.get_embedding_table()],
             feed_dict={input_ids_placeholder: input_ids})
         attention_mask = sess.run(create_attention_mask_from_input_mask(input_ids_tensor, input_mask_tensor))
-        transformer_output = sess.run(effective_transformer_layer.get_transformer_output(),
-                                      feed_dict={input_embedding_placeholder: input_embedding,
-                                                 attention_mask_placeholder: attention_mask,
-                                                 input_mask_placeholder: input_mask})
+        if args.effective_mode:
+            transformer_output = sess.run(effective_transformer_layer.get_transformer_output(),
+                                          feed_dict={input_embedding_placeholder: input_embedding,
+                                                     attention_mask_placeholder: attention_mask,
+                                                     input_mask_placeholder: input_mask})
+        else:
+            transformer_output = sess.run(standard_transformer_layer.get_transformer_output(),
+                                          feed_dict={input_embedding_placeholder: input_embedding,
+                                                     attention_mask_placeholder: attention_mask,
+                                                     input_mask_placeholder: input_mask})
         probs = sess.run(output_layer.get_predict_probs(),
                          feed_dict={transformer_output_placeholder: transformer_output,
                                     embedding_table_placeholder: embedding_table})
@@ -153,6 +163,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Bert performance measuring sample.')
     parser.add_argument('-d', '--model_dir', type=str, required=True, help='Model directory.')
+    parser.add_argument('-e', '--effective_mode', action='store_true', help='Create model with effective transformer.')
     parser.add_argument('-p', '--precision', type=str, default='fp32', choices=['fp32', 'fp16'], help='Weight precision.')
     parser.add_argument('-b', '--batch_size', type=int, default=32, help='Batch size.')
     parser.add_argument('-m', '--max_seq_length', type=int, default=32, help='Max sequence length.')

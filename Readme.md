@@ -26,7 +26,7 @@ By calculating the prefix sum of the input [mask matrix](https://github.com/goog
 The following figure illustrates how to access valid inputs and dynamically remove and restore padding values during the calculation.
 All valid inputs are colored in green while padding values are colored in gray.
 
-<div align=center><img src="./images/1.png" width="50%" height="50%"></div>
+<img src="./images/1.png" width="50%" height="50%">
 
 
 ## Environment requirements
@@ -142,6 +142,3 @@ $ cmake -DTF_PATH=/your/path/to/pythonx.x/site-packages/tensorflow_core/ ..
 $ make
 $ cp lib/libtf_effectivetransformer.so ../python/effective_transformer/libtf_effectivetransformer.so.1.15
 ```
-
-## How to use
-* [Tensorflow examples](https://github.com/bytedance/effective_transformer/tree/master/sample/tensorflow)

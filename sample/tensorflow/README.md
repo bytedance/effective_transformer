@@ -93,12 +93,8 @@ et  cost : 57.7004 ms
 ```
 
 ## Run with fp16
-The original `modeling.py` file in [bert](https://github.com/google-research/bert) repo set tensors to fp32 in the following line
-```python
-adder = (1.0 - tf.cast(attention_mask, tf.float32)) * -10000.0
-```
-In order to support fp16, we change it to
-```python
-adder = (1.0 - attention_mask) * -10000.0
-```
+The original `modeling.py` file and pretrained BERT model in [bert](https://github.com/google-research/bert) repo set float tensors to fp32.
+
+In order to support fp16, we rewrite the functions in `modeling.py` by passing an additional parameter `tf_dtype` and apply post-training fp16 quantization to saved model.
+
 Then we can run benchmark and cloze task with fp16 by setting argument `-p` to `fp16`.

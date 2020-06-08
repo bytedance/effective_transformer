@@ -38,17 +38,29 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 def load_transformer_weights(checkpoint_path, bert_config, batch_size, max_seq_len, tf_dtype):
     """Load transformer weights"""
     input_embedding_placeholder = tf.placeholder(shape=[batch_size, max_seq_len, bert_config.hidden_size], dtype=tf_dtype, name="input_embedding")
-    input_mask_placeholder = tf.placeholder(shape=[batch_size, max_seq_len], dtype=tf.int32, name="input_mask")
+    attention_mask_placeholder = tf.placeholder(shape=[batch_size, max_seq_len, max_seq_len], dtype=tf_dtype, name="attention_mask")
 
-    TransformerLayer(bert_config, input_embedding_placeholder, input_mask_placeholder)
+    TransformerLayer(bert_config, input_embedding_placeholder, attention_mask_placeholder)
 
     config = tf.ConfigProto()
     config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
     with tf.Session(config=config) as sess:
-        saver = tf.train.Saver()
-        saver.restore(sess, checkpoint_path)
-        all_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-        transformer_vars = [v.name for v in all_vars if 'layer' in v.name]
+        variables_to_restore = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        if tf_dtype == tf.float16:
+            # https://stackoverflow.com/questions/42793027/quantize-tensorflow-graph-to-float16
+            sess.run(tf.global_variables_initializer())
+            for variable in variables_to_restore:
+                var = tf.contrib.framework.load_variable(checkpoint_path, variable.op.name)
+                if var.dtype == np.float32:
+                    tf.add_to_collection('assignOps', variable.assign(tf.cast(var, tf.float16)))
+                else:
+                    tf.add_to_collection('assignOps', variable.assign(var))
+            sess.run(tf.get_collection('assignOps'))
+        else:
+            saver = tf.train.Saver(variables_to_restore)
+            saver.restore(sess, checkpoint_path)
+
+        transformer_vars = [v.name for v in variables_to_restore if 'layer' in v.name]
         weights_value = sess.run(transformer_vars)
 
     tf.reset_default_graph()
@@ -109,24 +121,33 @@ def main(args):
     embedding_table_placeholder = tf.placeholder(shape=[bert_config.vocab_size, bert_config.hidden_size], dtype=tf_dtype, name="embedding_table")
     transformer_output_placeholder = tf.placeholder(shape=[batch_size, max_seq_len, bert_config.hidden_size], dtype=tf_dtype, name="transformer_output")
 
-    embedding_layer = EmbeddingLayer(bert_config, input_ids_placeholder)
+    embedding_layer = EmbeddingLayer(bert_config, tf_dtype, input_ids_placeholder)
     if args.effective_mode:
         effective_transformer_layer = EffectiveTransformerLayer(batch_size, max_seq_len, bert_config,
                                                                 attention_mask_placeholder, input_mask_placeholder,
                                                                 input_embedding_placeholder, weights_value)
     else:
-        standard_transformer_layer = TransformerLayer(bert_config, input_embedding_placeholder, input_mask_placeholder)
-    output_layer = LanguageModelOutputLayer(bert_config, transformer_output_placeholder, embedding_table_placeholder)
-
-    # model saver
-    variables_to_restore = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-    saver = tf.train.Saver(variables_to_restore)
+        standard_transformer_layer = TransformerLayer(bert_config, input_embedding_placeholder, attention_mask_placeholder)
+    output_layer = LanguageModelOutputLayer(bert_config, tf_dtype, transformer_output_placeholder, embedding_table_placeholder)
 
     config = tf.ConfigProto()
     config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
     with tf.Session(config=config) as sess:
         # restore embedding layer and output layer
-        saver.restore(sess, checkpoint_path)
+        variables_to_restore = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+        if tf_dtype == tf.float16:
+            # https://stackoverflow.com/questions/42793027/quantize-tensorflow-graph-to-float16
+            sess.run(tf.global_variables_initializer())
+            for variable in variables_to_restore:
+                var = tf.contrib.framework.load_variable(checkpoint_path, variable.op.name)
+                if var.dtype == np.float32:
+                    tf.add_to_collection('assignOps', variable.assign(tf.cast(var, tf.float16)))
+                else:
+                    tf.add_to_collection('assignOps', variable.assign(var))
+            sess.run(tf.get_collection('assignOps'))
+        else:
+            saver = tf.train.Saver(variables_to_restore)
+            saver.restore(sess, checkpoint_path)
 
         # process input data
         tokenizer = FullTokenizer(vocab_file=os.path.join(args.model_dir, 'vocab.txt'))
@@ -139,7 +160,7 @@ def main(args):
         input_embedding, embedding_table = sess.run(
             [embedding_layer.get_embedding_output(), embedding_layer.get_embedding_table()],
             feed_dict={input_ids_placeholder: input_ids})
-        attention_mask = sess.run(create_attention_mask_from_input_mask(input_ids_tensor, input_mask_tensor))
+        attention_mask = sess.run(create_attention_mask_from_input_mask(input_ids_tensor, input_mask_tensor, tf_dtype))
         if args.effective_mode:
             transformer_output = sess.run(effective_transformer_layer.get_transformer_output(),
                                           feed_dict={input_embedding_placeholder: input_embedding,
@@ -148,8 +169,7 @@ def main(args):
         else:
             transformer_output = sess.run(standard_transformer_layer.get_transformer_output(),
                                           feed_dict={input_embedding_placeholder: input_embedding,
-                                                     attention_mask_placeholder: attention_mask,
-                                                     input_mask_placeholder: input_mask})
+                                                     attention_mask_placeholder: attention_mask})
         probs = sess.run(output_layer.get_predict_probs(),
                          feed_dict={transformer_output_placeholder: transformer_output,
                                     embedding_table_placeholder: embedding_table})

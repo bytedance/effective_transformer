@@ -19,7 +19,7 @@ import effective_transformer
 
 
 class EmbeddingLayer(object):
-    def __init__(self, config, input_ids, token_type_ids=None):
+    def __init__(self, config, tf_dtype, input_ids, token_type_ids=None):
         input_shape = modeling.get_shape_list(input_ids, expected_rank=2)
         batch_size = input_shape[0]
         seq_length = input_shape[1]
@@ -36,7 +36,8 @@ class EmbeddingLayer(object):
                     embedding_size=config.hidden_size,
                     initializer_range=config.initializer_range,
                     word_embedding_name="word_embeddings",
-                    use_one_hot_embeddings=False)
+                    use_one_hot_embeddings=False,
+                    tf_dtype=tf_dtype)
 
                 self.embedding_output = modeling.embedding_postprocessor(
                     input_tensor=embedding_output,
@@ -48,7 +49,8 @@ class EmbeddingLayer(object):
                     position_embedding_name="position_embeddings",
                     initializer_range=config.initializer_range,
                     max_position_embeddings=config.max_position_embeddings,
-                    dropout_prob=config.hidden_dropout_prob)
+                    dropout_prob=config.hidden_dropout_prob,
+                    tf_dtype=tf_dtype)
 
     def get_embedding_output(self):
         return self.embedding_output
@@ -58,19 +60,10 @@ class EmbeddingLayer(object):
 
 
 class TransformerLayer(object):
-    def __init__(self, config, input_embedding, input_mask=None):
-        input_shape = modeling.get_shape_list(input_embedding, expected_rank=3)
-        batch_size = input_shape[0]
-        seq_length = input_shape[1]
-
-        if input_mask is None:
-            input_mask = tf.ones(shape=[batch_size, seq_length], dtype=tf.int32)
-
+    def __init__(self, config, input_embedding, attention_mask):
         # Keep variable names the same as BERT
         with tf.variable_scope("bert"):
             with tf.variable_scope("encoder"):
-                attention_mask = modeling.create_attention_mask_from_input_mask(input_embedding, input_mask)
-
                 all_encoder_layers = modeling.transformer_model(
                     input_tensor=input_embedding,
                     attention_mask=attention_mask,
@@ -108,7 +101,7 @@ class EffectiveTransformerLayer(object):
 
 
 class LanguageModelOutputLayer(object):
-    def __init__(self, config, input_hidden, embedding_table):
+    def __init__(self, config, tf_dtype, input_hidden, embedding_table):
         # Keep variable names the same as BERT
         with tf.variable_scope("cls"):
             with tf.variable_scope("predictions"):
@@ -120,7 +113,7 @@ class LanguageModelOutputLayer(object):
                         kernel_initializer=modeling.create_initializer(config.initializer_range))
                     self.transformed_output = modeling.layer_norm(self.transformed_output)
 
-                output_bias = tf.Variable(tf.zeros([config.vocab_size]), name="output_bias")
+                output_bias = tf.Variable(tf.zeros([config.vocab_size], dtype=tf_dtype), name="output_bias", dtype=tf_dtype)
                 self.final_output = tf.add(tf.matmul(self.transformed_output, tf.transpose(embedding_table)),
                                            output_bias)
                 self.probs = tf.nn.softmax(self.final_output, name='token_probs')

@@ -138,7 +138,7 @@ optional arguments:
 `TF_PATH : path to libtensorflow_framework.so`
 ```
 $ mkdir build && cd build
-$ cmake -DTF_PATH=/your/path/to/pythonx.x/site-packages/tensorflow_core/ ..
+$ cmake -DTF_PATH=/your/path/to/pythonx.x/site-packages/tensorflow/ ..
 $ make
-$ cp lib/libtf_effectivetransformer.so ../python/effective_transformer/libtf_effectivetransformer.so.1.15
+$ cp lib/libtf_effectivetransformer.so ../python/effective_transformer/libtf_effectivetransformer.so
 ```

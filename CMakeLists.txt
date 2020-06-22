@@ -29,6 +29,7 @@ message(STATUS "TF_PATH      : " ${TF_PATH})
 list(APPEND COMMON_LIB_DIRS
   ${CUDA_PATH}/lib64
   ${TF_PATH}/
+  ${TF_PATH}/python
 )
 foreach(lib ${COMMON_LIB_DIRS})
   message(STATUS "lib path     : " ${lib})

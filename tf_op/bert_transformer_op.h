@@ -26,6 +26,9 @@
 #include "tensorflow/core/lib/core/errors.h"
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include <cublas_v2.h>
+
+#include <cuda.h>
+
 using namespace effectivetransformer;
 namespace tensorflow
 {
@@ -159,5 +162,13 @@ namespace tensorflow
     };
 
   } //namespace functor
+
+  void exclusiveScan(CUstream stream, void** buffers,
+                    const char* opaque, size_t opaque_len);
+  
+  template <typename T>
+  void compressBertInput(CUstream stream, void** buffers,
+                    const char* opaque, size_t opaque_len);
+
 } //namespace tensorflow
 #endif

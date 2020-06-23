@@ -22,6 +22,14 @@
 #include <cuda_fp16.h>
 #include <mutex>
 #include <map>
+
+#include "tensorflow/compiler/tf2xla/shape_util.h"
+#include "tensorflow/compiler/tf2xla/xla_helpers.h"
+#include "tensorflow/compiler/tf2xla/xla_op_kernel.h"
+#include "tensorflow/compiler/tf2xla/xla_op_registry.h"
+#include "tensorflow/compiler/xla/client/xla_builder.h"
+#include "tensorflow/core/framework/op_kernel.h"
+
 namespace tensorflow
 {
 namespace
@@ -272,6 +280,82 @@ REGISTER_OP("BertTransformerInput")
       c->set_output(3, c->input(1));
       return Status::OK();
       });
+
+template <typename T>
+class BertTransformerInputXlaOp : public XlaOpKernel
+{
+public:
+  explicit BertTransformerInputXlaOp(OpKernelConstruction *context) : XlaOpKernel(context)
+  {
+    OP_REQUIRES_OK(context, context->GetAttr("batch_size", &batch_size_));
+    OP_REQUIRES_OK(context, context->GetAttr("from_seq_len", &from_seq_len_));
+    OP_REQUIRES_OK(context, context->GetAttr("to_seq_len", &to_seq_len_));
+    OP_REQUIRES_OK(context, context->GetAttr("head_num", &head_num_));
+    OP_REQUIRES_OK(context, context->GetAttr("size_per_head", &size_per_head_));
+
+    OP_REQUIRES(context, (from_seq_len_ == to_seq_len_),
+                errors::InvalidArgument("Only support from_seq_len == to_seq_len"));
+  }
+
+  void Compile(XlaOpKernelContext *context) override
+  {
+    OP_REQUIRES(context, context->num_inputs() == 2, errors::InvalidArgument("There should be 2 input arguments."));
+
+    xla::XlaOp from_tensor = context->Input(0);
+    xla::XlaOp mask = context->Input(1);
+
+    auto from_tensor_xla_shape_or = context->InputXlaShape(0);
+    OP_REQUIRES_OK(context, from_tensor_xla_shape_or.status());
+    auto mask_shape_or = context->InputXlaShape(1);
+    OP_REQUIRES_OK(context, mask_shape_or.status());
+
+    int prefix_sum_real_size = batch_size_ * from_seq_len_;
+    int prefix_sum_buf_size = prefix_sum_real_size * 2;
+    xla::XlaOp prefix_sum = xla::CustomCall(context->builder(),
+                                            "exclusiveScan", {mask},
+                                            xla::ShapeUtil::MakeShape(xla::PrimitiveType::S32, {prefix_sum_buf_size}),
+                                            std::to_string(prefix_sum_real_size));
+
+    string compress_bert_input_opaque = std::to_string(batch_size_) + " " +
+                                        std::to_string(from_seq_len_) + " " +
+                                        std::to_string(head_num_ * size_per_head_);
+    xla::Shape to_tensor_shape = from_tensor_xla_shape_or.ValueOrDie();
+    xla::Shape valid_word_num_shape = xla::ShapeUtil::MakeShape(xla::PrimitiveType::S32, {1});
+    xla::Shape batch_idx_shape = mask_shape_or.ValueOrDie();
+    xla::Shape word_idx_shape = mask_shape_or.ValueOrDie();
+    xla::Shape compress_bert_input_shape = xla::ShapeUtil::MakeTupleShape({to_tensor_shape, valid_word_num_shape, batch_idx_shape, word_idx_shape});
+    xla::XlaOp outputs = xla::CustomCall(context->builder(),
+                                         "compressBertInput" + std::string(typeid(T).name()),
+                                         {from_tensor, mask, prefix_sum}, compress_bert_input_shape, compress_bert_input_opaque);
+
+    xla::XlaOp to_tensor = xla::GetTupleElement(outputs, 0);
+    xla::XlaOp valid_word_num = xla::GetTupleElement(outputs, 1);
+    xla::XlaOp batch_idx = xla::GetTupleElement(outputs, 2);
+    xla::XlaOp word_idx = xla::GetTupleElement(outputs, 3);
+
+    context->SetOutput(0, to_tensor);
+    context->SetOutput(1, valid_word_num);
+    context->SetOutput(2, batch_idx);
+    context->SetOutput(3, word_idx);
+  }
+
+private:
+  int batch_size_, from_seq_len_, to_seq_len_, head_num_, size_per_head_;
+  typedef TransformerTFTraits<T> traits_;
+  typedef typename traits_::DataType DataType_;
+};
+
+#ifdef GOOGLE_CUDA
+REGISTER_XLA_OP(Name("BertTransformerInput")
+                .Device(DEVICE_GPU_XLA_JIT)
+                .TypeConstraint("T", DT_FLOAT),
+                BertTransformerInputXlaOp<float>);
+// REGISTER_XLA_OP(Name("BertTransformerInput")
+//                 .Device(DEVICE_GPU_XLA_JIT)
+//                 .TypeConstraint("T", DT_HALF),
+//                 BertTransformerInputXlaOp<Eigen::half>);
+#endif
+
 
 template <typename Device, typename T>
 class BertTransformerInputOp : public OpKernel

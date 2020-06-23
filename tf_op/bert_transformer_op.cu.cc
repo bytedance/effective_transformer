@@ -23,10 +23,85 @@
 #include "tensorflow/core/framework/op.h"
 #include <cuda_runtime.h>
 #include <string>
+#include <stdlib.h>
+#include <vector>
+
+#include "tensorflow/compiler/xla/service/custom_call_target_registry.h"
+
+
 namespace tensorflow
 {
 using GPUDevice = Eigen::GpuDevice;
 using namespace effectivetransformer;
+
+std::vector<std::string> split(const std::string& str, char delim = ' ')
+{   
+    std::vector<std::string> cont;
+    std::size_t current, previous = 0;
+    current = str.find(delim);
+    while (current != std::string::npos) {
+        cont.push_back(str.substr(previous, current - previous));
+        previous = current + 1;
+        current = str.find(delim, previous);
+    }
+    cont.push_back(str.substr(previous, current - previous));
+    return cont;
+}
+
+void exclusiveScan(CUstream stream, void** buffers,
+                    const char* opaque, size_t opaque_len) {
+  int prefix_sum_real_size = atoi(opaque);
+  const int* mask_buf = reinterpret_cast<int*>(buffers[0]);
+  int* prefix_sum_buf = reinterpret_cast<int*>(buffers[1]);
+  exclusiveScan_kernelLauncher(prefix_sum_buf, mask_buf, prefix_sum_real_size, stream);
+}
+
+XLA_REGISTER_CUSTOM_CALL_TARGET(exclusiveScan, "CUDA");
+
+template <typename T>
+void compressBertInput(CUstream stream, void** buffers,
+                    const char* opaque, size_t opaque_len) {
+  typedef typename TransformerTFTraits<T>::DataType DataType_;
+
+  std::string sizes(opaque);
+  std::vector<std::string> sizes_3 = split(sizes);
+  int batch_size = std::stoi(sizes_3[0]);
+  int from_seq_len = std::stoi(sizes_3[1]);
+  int hidden_size = std::stoi(sizes_3[2]);
+  int word_num = batch_size * from_seq_len;
+
+  const DataType_ * from_tensor = reinterpret_cast<DataType_ *>(buffers[0]);
+  const int* mask = reinterpret_cast<int*>(buffers[1]);
+  const int* prefix_sum = reinterpret_cast<int*>(buffers[2]);
+  DataType_ * to_tensor = reinterpret_cast<DataType_ *>(buffers[3]);
+  int* valid_word_num = reinterpret_cast<int*>(buffers[4]);
+  int* batch_idx = reinterpret_cast<int*>(buffers[5]);
+  int* word_idx = reinterpret_cast<int*>(buffers[6]);
+
+  compressBertInput_kernelLauncher(
+        from_tensor, mask, prefix_sum,
+        to_tensor, batch_idx, word_idx,
+        batch_size ,from_seq_len, hidden_size, stream);
+
+  int valid_word_num_host = 0;
+  int last_mask_host = 0;
+  check_cuda_error(cudaMemcpyAsync(
+    &valid_word_num_host, prefix_sum + word_num - 1, sizeof(int), cudaMemcpyDeviceToHost, stream));
+  check_cuda_error(cudaMemcpyAsync(
+    &last_mask_host, mask + word_num - 1, sizeof(int), cudaMemcpyDeviceToHost, stream));
+  check_cuda_error(cudaStreamSynchronize(stream));
+  if (last_mask_host == 1) {
+    // in case of the last mask is 1, since this is exclusive scan
+    valid_word_num_host ++;
+  }
+  check_cuda_error(cudaMemcpyAsync(
+        valid_word_num, &valid_word_num_host, sizeof(int), cudaMemcpyHostToDevice, stream));
+}
+
+
+XLA_REGISTER_CUSTOM_CALL_TARGET_WITH_SYM("compressBertInput" + std::string(typeid(float).name()), compressBertInput<float>, "CUDA");
+XLA_REGISTER_CUSTOM_CALL_TARGET_WITH_SYM("compressBertInput" + std::string(typeid(Eigen::half).name()), compressBertInput<Eigen::half>, "CUDA");
+
 
 namespace functor
 {

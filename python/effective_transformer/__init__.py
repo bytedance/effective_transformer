@@ -15,18 +15,16 @@
 import os
 import tensorflow as tf
 
-__lib_tf_1_15 = os.path.join(os.path.dirname(
-    os.path.abspath(__file__)), "libtf_effectivetransformer.so.1.15")
+__lib_tf = os.path.join(os.path.dirname(
+    os.path.abspath(__file__)), "libtf_effectivetransformer.so")
 
 
 def tf_load_op_library(path):
-    if not tf.__version__.startswith('1.15'):
-        warnings.warn('Only tensorflow 1.15.x supported')
     lib = tf.load_op_library(path)
     return lib
 
 
-transformer_op_module = tf_load_op_library(__lib_tf_1_15)
+transformer_op_module = tf_load_op_library(__lib_tf)
 
 
 def get_sequence_output(

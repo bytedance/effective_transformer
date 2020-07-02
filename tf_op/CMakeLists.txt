@@ -15,4 +15,4 @@ add_definitions(-DNDEBUG)
 
 add_library(tf_effectivetransformer SHARED ${tf_bert_transformer_files})
 set_target_properties(tf_effectivetransformer PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-target_link_libraries(tf_effectivetransformer PRIVATE -lcublas -lcudart -ltensorflow_framework ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(tf_effectivetransformer PRIVATE -lcublas -lcudart -l:libtensorflow_framework.so.2 ${CMAKE_THREAD_LIBS_INIT})

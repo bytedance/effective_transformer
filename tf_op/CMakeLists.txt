@@ -5,8 +5,10 @@ cmake_minimum_required(VERSION 3.8)
 set(tf_bert_transformer_files
   bert_transformer_op.cc
   bert_transformer_op.cu.cc
+  scatter_nd_op.cc
   ../cuda/attention.cu
   ../cuda/cuda_kernels.cu
+  ../cuda/scatter_nd.cu
 )
 
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)

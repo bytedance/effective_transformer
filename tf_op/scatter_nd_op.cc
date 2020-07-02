@@ -121,7 +121,7 @@ public:
     DataType_ *dst_ptr =
         reinterpret_cast<DataType_ *>(output->flat<T>().data());
 
-    cudaMemset(dst_ptr, 0, sizeof(DataType_) * (dst_m * dst_n));
+    cudaMemset(dst_ptr, -100000.0, sizeof(DataType_) * (dst_m * dst_n));
     scatterNd_kernel_launcher(src_ptr, indices_ptr, dst_ptr, src_m, dst_m,
                               src_n, stream);
 

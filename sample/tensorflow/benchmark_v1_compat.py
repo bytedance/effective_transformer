@@ -14,15 +14,20 @@
 
 from datetime import datetime
 import argparse
-import modeling
+import modeling_v1_compat as modeling
 import numpy as np
 import os
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+import tensorflow as tfv2
 import effective_transformer
+
+
+tf.disable_eager_execution()
+
 
 # disable tensorflow debugging information
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+tf.logging.set_verbosity(tf.logging.ERROR)
 
 def main(args):
   bert_config = modeling.BertConfig.from_json_file(args.config)
@@ -32,11 +37,14 @@ def main(args):
   batch_size  = args.batch_size
   avg_seq_len = args.avg_seq_length
   max_seq_len = args.max_seq_length
+  real_max_seq_len = args.real_max_seq_length
   tf_dtype = tf.float16 if args.precision =='fp16' else tf.float32
+  if args.precision =='fp16':
+    tfv2.keras.backend.set_floatx('float16')
 
   # fake input array length
   input_len = np.random.randint(
-    low = 2 * avg_seq_len - max_seq_len, high = max_seq_len + 1, 
+    low = 2 * avg_seq_len - real_max_seq_len, high = real_max_seq_len + 1, 
     size = (batch_size), dtype = np.int32)
   valid_word_num = sum(input_len)
 
@@ -48,17 +56,15 @@ def main(args):
   for b_idx, s_len in enumerate(input_len) :
     input_mask[b_idx][:s_len] = 1
 
-  input_ids_tensor  = tf.convert_to_tensor(input_ids,  dtype = tf.int32)
   input_mask_tensor = tf.convert_to_tensor(input_mask, dtype = tf.int32)
-
   # fake embedding output 
-  embed_output = np.random.randn(batch_size, max_seq_len, bert_config.hidden_size)
-  input_tensor = tf.convert_to_tensor(embed_output, dtype = tf_dtype)
+  embed_output = np.random.randn(batch_size, max_seq_len, bert_config.hidden_size).astype(np.float16)
+  input_tensor = tf.placeholder(tf_dtype, shape=(batch_size, max_seq_len, bert_config.hidden_size))
 
   # keep attention_mask for compatible reason
   att_mask = np.tile(input_mask, max_seq_len)
   att_mask = att_mask.reshape(batch_size, max_seq_len, max_seq_len)
-  attention_mask = tf.convert_to_tensor(att_mask, dtype = tf_dtype)
+  attention_mask = tf.placeholder(tf_dtype, shape=(batch_size, max_seq_len, max_seq_len))
 
   # input info
   valid_word_num = sum(input_len)
@@ -102,8 +108,8 @@ def main(args):
     )
 
     # diff
-    val1 = sess.run(std_bert).reshape(-1, 768)
-    val2 = sess.run(et_bert).reshape(-1, 768)
+    val1 = sess.run(std_bert, feed_dict={input_tensor: embed_output, attention_mask: att_mask}).reshape(-1, 768)
+    val2 = sess.run(et_bert, feed_dict={input_tensor: embed_output, attention_mask: att_mask}).reshape(-1, 768)
     diff = []
     for b_idx, s_len in enumerate(input_len) :
       for w_idx in range(s_len) :
@@ -114,17 +120,16 @@ def main(args):
       iter_num = 128
       # warm up
       for i in range(10) : 
-        sess.run(output_tensor)
+        sess.run(output_tensor, feed_dict={input_tensor: embed_output, attention_mask: att_mask})
       
       beg = datetime.now()
       for i in range(iter_num):
-        sess.run(output_tensor)
+        sess.run(output_tensor, feed_dict={input_tensor: embed_output, attention_mask: att_mask})
       end = datetime.now()
       return (end - beg).total_seconds() * 1000 / iter_num # ms
 
     print("xla cost : {:.6} ms".format(time_inference(std_bert)))
     print("et  cost : {:.6} ms".format(time_inference(et_bert)))
-
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description = 'Bert performance measuring sample.')
   parser.add_argument(
@@ -132,10 +137,12 @@ if __name__ == "__main__":
   parser.add_argument(
       '-p', '--precision', type = str, default = 'fp16', choices=['fp32', 'fp16'], help = 'Weight precision.')
   parser.add_argument(
-      '-b', '--batch_size', type = int, default = 128, help = 'Batch size.')
+      '-b', '--batch_size', type = int, default = 200, help = 'Batch size.')
   parser.add_argument(
       '-m', '--max_seq_length', type = int, default = 32, help = 'Max sequence length.')
   parser.add_argument(
       '-a', '--avg_seq_length', type = int, default = 20, help = 'Average sequence length.')
+  parser.add_argument(
+      '-r', '--real_max_seq_length', type = int, default = 22, help = 'Average sequence length.')
   args = parser.parse_args()
   main(args)

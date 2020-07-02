@@ -14,15 +14,17 @@
 
 from datetime import datetime
 import argparse
-import modeling
+import modeling_rm_pad as modeling
 import numpy as np
 import os
-import tensorflow as tf
-import effective_transformer
+import tensorflow.compat.v1 as tf
+
+tf.disable_eager_execution()
+
 
 # disable tensorflow debugging information
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+tf.logging.set_verbosity(tf.logging.ERROR)
 
 def main(args):
   bert_config = modeling.BertConfig.from_json_file(args.config)
@@ -32,33 +34,26 @@ def main(args):
   batch_size  = args.batch_size
   avg_seq_len = args.avg_seq_length
   max_seq_len = args.max_seq_length
+  real_max_seq_len = args.real_max_seq_length
   tf_dtype = tf.float16 if args.precision =='fp16' else tf.float32
 
   # fake input array length
   input_len = np.random.randint(
-    low = 2 * avg_seq_len - max_seq_len, high = max_seq_len + 1, 
+    low = 2 * avg_seq_len - real_max_seq_len, high = real_max_seq_len + 1, 
     size = (batch_size), dtype = np.int32)
   valid_word_num = sum(input_len)
 
   # fake input id and mask
-  input_ids  = np.random.randint(
-    low = 0, high = bert_config.vocab_size, 
-    size = (batch_size, max_seq_len), dtype = np.int32)
-  input_mask = np.zeros((batch_size, max_seq_len), dtype = np.int32)
+  index = []
   for b_idx, s_len in enumerate(input_len) :
-    input_mask[b_idx][:s_len] = 1
-
-  input_ids_tensor  = tf.convert_to_tensor(input_ids,  dtype = tf.int32)
-  input_mask_tensor = tf.convert_to_tensor(input_mask, dtype = tf.int32)
+    tmp = [b_idx * max_seq_len + x for x in range(s_len)]
+    index.extend(tmp)
+  index = np.array(index).astype(np.int32)
+  index_tensor = tf.placeholder(tf.int32, shape=(None, ))
 
   # fake embedding output 
-  embed_output = np.random.randn(batch_size, max_seq_len, bert_config.hidden_size)
-  input_tensor = tf.convert_to_tensor(embed_output, dtype = tf_dtype)
-
-  # keep attention_mask for compatible reason
-  att_mask = np.tile(input_mask, max_seq_len)
-  att_mask = att_mask.reshape(batch_size, max_seq_len, max_seq_len)
-  attention_mask = tf.convert_to_tensor(att_mask, dtype = tf_dtype)
+  embed_output = np.random.randn(batch_size, max_seq_len, bert_config.hidden_size).astype(np.float16)
+  input_tensor = tf.placeholder(tf_dtype, shape=(batch_size, max_seq_len, bert_config.hidden_size))
 
   # input info
   valid_word_num = sum(input_len)
@@ -68,7 +63,7 @@ def main(args):
   # bert with standard transformer
   std_bert = modeling.transformer_model(
     input_tensor                 = input_tensor,
-    attention_mask               = attention_mask,
+    index_tensor                 = index_tensor,
     hidden_size                  = bert_config.hidden_size,
     num_hidden_layers            = bert_config.num_hidden_layers,
     num_attention_heads          = bert_config.num_attention_heads,
@@ -77,53 +72,62 @@ def main(args):
     hidden_dropout_prob          = bert_config.hidden_dropout_prob,
     attention_probs_dropout_prob = bert_config.attention_probs_dropout_prob,
     initializer_range            = bert_config.initializer_range,
-    do_return_all_layers         = False)
+    do_return_all_layers         = False,
+    tf_dtype                     = tf_dtype)
 
   config = tf.ConfigProto()
-  config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
+  # config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
   with tf.Session(config=config) as sess:
     # init weights
     sess.run(tf.global_variables_initializer())
 
-    # get transformer weights
-    all_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-    transformer_vars = [v for v in all_vars if v.name.startswith('layer')]
-    weights_value = sess.run(transformer_vars)
 
-    # bert with effective transformer
-    et_bert = effective_transformer.get_sequence_output(
-      max_batch_size = batch_size,
-      max_seq_length = max_seq_len,
-      config         = bert_config,
-      attention_mask = attention_mask,
-      input_mask     = input_mask_tensor,
-      from_tensor    = input_tensor,
-      weights_value  = weights_value,
-    )
 
-    # diff
-    val1 = sess.run(std_bert).reshape(-1, 768)
-    val2 = sess.run(et_bert).reshape(-1, 768)
-    diff = []
-    for b_idx, s_len in enumerate(input_len) :
-      for w_idx in range(s_len) :
-        idx = b_idx * args.max_seq_length + w_idx
-        diff.append(np.fabs(val1[idx] - val2[idx]).max())
-    print("max diff : {:.6}, avg diff : {:.6}.".format(max(diff), sum(diff) / len(diff)))
+
+    
     def time_inference(output_tensor) :
       iter_num = 128
+
+      ########
+      input_len = np.random.randint(
+        low = 2 * avg_seq_len - real_max_seq_len, high = real_max_seq_len + 1, 
+        size = (batch_size), dtype = np.int32)
+      index = []
+      for b_idx, s_len in enumerate(input_len) :
+        tmp = [b_idx * max_seq_len + x for x in range(s_len)]
+        index.extend(tmp)
+      index = np.array(index).astype(np.int32)
+      #########
+
       # warm up
-      for i in range(10) : 
-        sess.run(output_tensor)
+      for i in range(10):
+        sess.run(output_tensor, feed_dict={input_tensor: embed_output, index_tensor: index})
+
       
-      beg = datetime.now()
+      acc_time = None 
+      
       for i in range(iter_num):
-        sess.run(output_tensor)
-      end = datetime.now()
-      return (end - beg).total_seconds() * 1000 / iter_num # ms
+        
+        ########
+        input_len = np.random.randint(
+          low = 2 * avg_seq_len - real_max_seq_len, high = real_max_seq_len + 1, 
+          size = (batch_size), dtype = np.int32)
+        index = []
+        for b_idx, s_len in enumerate(input_len) :
+          tmp = [b_idx * max_seq_len + x for x in range(s_len)]
+          index.extend(tmp)
+        index = np.array(index).astype(np.int32)
+        #########
+        beg = datetime.now()
+        sess.run(output_tensor, feed_dict={input_tensor: embed_output, index_tensor: index})
+        end = datetime.now()
+        if acc_time is None:
+          acc_time = end - beg
+        else:
+          acc_time += (end - beg)
+      return acc_time.total_seconds() * 1000 / iter_num # ms
 
     print("xla cost : {:.6} ms".format(time_inference(std_bert)))
-    print("et  cost : {:.6} ms".format(time_inference(et_bert)))
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description = 'Bert performance measuring sample.')
@@ -132,10 +136,12 @@ if __name__ == "__main__":
   parser.add_argument(
       '-p', '--precision', type = str, default = 'fp16', choices=['fp32', 'fp16'], help = 'Weight precision.')
   parser.add_argument(
-      '-b', '--batch_size', type = int, default = 128, help = 'Batch size.')
+      '-b', '--batch_size', type = int, default = 200, help = 'Batch size.')
   parser.add_argument(
       '-m', '--max_seq_length', type = int, default = 32, help = 'Max sequence length.')
   parser.add_argument(
       '-a', '--avg_seq_length', type = int, default = 20, help = 'Average sequence length.')
+  parser.add_argument(
+      '-r', '--real_max_seq_length', type = int, default = 22, help = 'Average sequence length.')
   args = parser.parse_args()
   main(args)

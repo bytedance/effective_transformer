@@ -16,7 +16,7 @@ import os
 import tensorflow as tf
 
 __lib_tf = os.path.join(os.path.dirname(
-    os.path.abspath(__file__)), "libtf_effectivetransformer.so")
+    os.path.abspath(__file__)), "../../build/lib/libtf_effectivetransformer.so")
 
 
 def tf_load_op_library(path):

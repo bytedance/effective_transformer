@@ -51,6 +51,13 @@ def main(args):
   index = np.array(index).astype(np.int32)
   index_tensor = tf.placeholder(tf.int32, shape=(None, ))
 
+  input_mask = np.zeros((batch_size, max_seq_len), dtype = np.int32)
+  for b_idx, s_len in enumerate(input_len) :
+    input_mask[b_idx][:s_len] = 1
+  att_mask = np.tile(input_mask, max_seq_len)
+  att_mask = att_mask.reshape(batch_size, max_seq_len, max_seq_len)
+  attention_mask = tf.placeholder(tf_dtype, shape=(batch_size, max_seq_len, max_seq_len))
+
   # fake embedding output 
   embed_output = np.random.randn(batch_size, max_seq_len, bert_config.hidden_size).astype(np.float16)
   input_tensor = tf.placeholder(tf_dtype, shape=(batch_size, max_seq_len, bert_config.hidden_size))
@@ -64,6 +71,7 @@ def main(args):
   std_bert = modeling.transformer_model(
     input_tensor                 = input_tensor,
     index_tensor                 = index_tensor,
+    attention_mask               = attention_mask,
     hidden_size                  = bert_config.hidden_size,
     num_hidden_layers            = bert_config.num_hidden_layers,
     num_attention_heads          = bert_config.num_attention_heads,
@@ -72,8 +80,7 @@ def main(args):
     hidden_dropout_prob          = bert_config.hidden_dropout_prob,
     attention_probs_dropout_prob = bert_config.attention_probs_dropout_prob,
     initializer_range            = bert_config.initializer_range,
-    do_return_all_layers         = False,
-    tf_dtype                     = tf_dtype)
+    do_return_all_layers         = False)
 
   config = tf.ConfigProto()
   # config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
@@ -81,10 +88,6 @@ def main(args):
     # init weights
     sess.run(tf.global_variables_initializer())
 
-
-
-
-    
     def time_inference(output_tensor) :
       iter_num = 128
 
@@ -97,11 +100,17 @@ def main(args):
         tmp = [b_idx * max_seq_len + x for x in range(s_len)]
         index.extend(tmp)
       index = np.array(index).astype(np.int32)
+
+      input_mask = np.zeros((batch_size, max_seq_len), dtype = np.float16)
+      for b_idx, s_len in enumerate(input_len) :
+        input_mask[b_idx][:s_len] = 1
+      att_mask = np.tile(input_mask, max_seq_len)
+      att_mask = att_mask.reshape(batch_size, max_seq_len, max_seq_len)
       #########
 
       # warm up
       for i in range(10):
-        sess.run(output_tensor, feed_dict={input_tensor: embed_output, index_tensor: index})
+        sess.run(output_tensor, feed_dict={input_tensor: embed_output, index_tensor: index, attention_mask: att_mask})
 
       
       acc_time = None 
@@ -117,9 +126,15 @@ def main(args):
           tmp = [b_idx * max_seq_len + x for x in range(s_len)]
           index.extend(tmp)
         index = np.array(index).astype(np.int32)
+
+        input_mask = np.zeros((batch_size, max_seq_len), dtype = np.float16)
+        for b_idx, s_len in enumerate(input_len):
+          input_mask[b_idx][:s_len] = 1
+        att_mask = np.tile(input_mask, max_seq_len)
+        att_mask = att_mask.reshape(batch_size, max_seq_len, max_seq_len)
         #########
         beg = datetime.now()
-        sess.run(output_tensor, feed_dict={input_tensor: embed_output, index_tensor: index})
+        sess.run(output_tensor, feed_dict={input_tensor: embed_output, index_tensor: index, attention_mask: att_mask})
         end = datetime.now()
         if acc_time is None:
           acc_time = end - beg

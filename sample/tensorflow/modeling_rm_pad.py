@@ -562,6 +562,7 @@ def create_attention_mask_from_input_mask(from_tensor, to_mask):
 def attention_layer(from_tensor,
                     to_tensor,
                     index_tensor=None,
+                    attention_mask=None,
                     num_attention_heads=1,
                     size_per_head=512,
                     query_act=None,
@@ -572,8 +573,7 @@ def attention_layer(from_tensor,
                     do_return_2d_tensor=False,
                     batch_size=None,
                     from_seq_length=None,
-                    to_seq_length=None,
-                    tf_dtype=tf.float32):
+                    to_seq_length=None):
   """Performs multi-headed attention from `from_tensor` to `to_tensor`.
 
   This is an implementation of multi-headed attention based on "Attention
@@ -710,6 +710,21 @@ def attention_layer(from_tensor,
   attention_scores = tf.multiply(attention_scores,
                                 1.0 / math.sqrt(float(size_per_head)))
 
+  # if attention_mask is not None:
+  #   # `attention_mask` = [B, 1, F, T]
+  #   attention_mask = tf.expand_dims(attention_mask, axis=[1])
+
+  #   # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
+  #   # masked positions, this operation will create a tensor which is 0.0 for
+  #   # positions we want to attend and -10000.0 for masked positions.
+  #   # adder = (1.0 - tf.cast(attention_mask, tf.float32)) * -10000.0
+  #   adder = (1.0 - attention_mask) * -10000.0
+
+  #   # Since we are adding it to the raw scores before the softmax, this is
+  #   # effectively the same as removing these entirely.
+  #   attention_scores += adder
+    
+
   # Normalize the attention scores to probabilities.
   # `attention_probs` = [B, N, F, T]
   attention_probs = tf.nn.softmax(attention_scores)
@@ -745,6 +760,7 @@ def attention_layer(from_tensor,
 
 def transformer_model(input_tensor,
                       index_tensor=None,
+                      attention_mask=None,
                       hidden_size=768,
                       num_hidden_layers=12,
                       num_attention_heads=12,
@@ -753,8 +769,7 @@ def transformer_model(input_tensor,
                       hidden_dropout_prob=0.1,
                       attention_probs_dropout_prob=0.1,
                       initializer_range=0.02,
-                      do_return_all_layers=False,
-                      tf_dtype=None):
+                      do_return_all_layers=False):
   """Multi-headed, multi-layer Transformer from "Attention is All You Need".
 
   This is almost an exact implementation of the original Transformer encoder.
@@ -828,6 +843,7 @@ def transformer_model(input_tensor,
               from_tensor=layer_input,
               to_tensor=layer_input,
               index_tensor=index_tensor,
+              attention_mask=attention_mask,
               num_attention_heads=num_attention_heads,
               size_per_head=attention_head_size,
               attention_probs_dropout_prob=attention_probs_dropout_prob,
@@ -835,8 +851,7 @@ def transformer_model(input_tensor,
               do_return_2d_tensor=True,
               batch_size=batch_size,
               from_seq_length=seq_length,
-              to_seq_length=seq_length,
-              tf_dtype=tf_dtype)
+              to_seq_length=seq_length)
           attention_heads.append(attention_head)
 
         attention_output = None
@@ -873,15 +888,10 @@ def transformer_model(input_tensor,
         prev_output = layer_output
         all_layer_outputs.append(layer_output)
   
-  final_output = prev_output
   # add padding
-  # if index_tensor is not None:
-  #   new_final_output = tf.Variable(np.ones(shape=[batch_size * seq_length, 
-  #                             hidden_size]), dtype=tf_dtype)
-  #   update = tf.scatter_update(new_final_output, index_tensor, final_output)
-  #   final_output = new_final_output
-  # final_output = reshape_from_matrix(final_output, input_shape)
-
+  final_output = prev_output
+  origin_shape = tf.constant([batch_size * seq_length, input_width], dtype=tf.int32)
+  final_output = module.scatter_nd_memcpy(index_tensor, final_output, origin_shape)
 
   return final_output
 

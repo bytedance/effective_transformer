@@ -130,6 +130,7 @@ def main(args):
 
     print("xla cost : {:.6} ms".format(time_inference(std_bert)))
     print("et  cost : {:.6} ms".format(time_inference(et_bert)))
+    
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description = 'Bert performance measuring sample.')
   parser.add_argument(

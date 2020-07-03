@@ -735,16 +735,10 @@ def attention_layer(from_tensor,
   # `context_layer` = [B, F, N, H]
   context_layer = tf.transpose(context_layer, [0, 2, 1, 3])
 
-  if do_return_2d_tensor:
-    # `context_layer` = [B*F, N*H]
-    context_layer = tf.reshape(
-        context_layer,
-        [batch_size * from_seq_length, num_attention_heads * size_per_head])
-  else:
-    # `context_layer` = [B, F, N*H]
-    context_layer = tf.reshape(
-        context_layer,
-        [batch_size, from_seq_length, num_attention_heads * size_per_head])
+  # `context_layer` = [B*F, N*H]
+  context_layer = tf.reshape(
+      context_layer,
+      [batch_size * from_seq_length, num_attention_heads * size_per_head])
 
   return context_layer
 
@@ -876,15 +870,8 @@ def transformer_model(input_tensor,
         prev_output = layer_output
         all_layer_outputs.append(layer_output)
 
-  if do_return_all_layers:
-    final_outputs = []
-    for layer_output in all_layer_outputs:
-      final_output = reshape_from_matrix(layer_output, input_shape)
-      final_outputs.append(final_output)
-    return final_outputs
-  else:
-    final_output = reshape_from_matrix(prev_output, input_shape)
-    return final_output
+  final_output = reshape_from_matrix(prev_output, input_shape)
+  return final_output
 
 
 def get_shape_list(tensor, expected_rank=None, name=None):

@@ -710,21 +710,20 @@ def attention_layer(from_tensor,
   attention_scores = tf.multiply(attention_scores,
                                 1.0 / math.sqrt(float(size_per_head)))
 
-  # if attention_mask is not None:
-  #   # `attention_mask` = [B, 1, F, T]
-  #   attention_mask = tf.expand_dims(attention_mask, axis=[1])
+  if attention_mask is not None:
+    # `attention_mask` = [B, 1, F, T]
+    attention_mask = tf.expand_dims(attention_mask, axis=[1])
 
-  #   # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
-  #   # masked positions, this operation will create a tensor which is 0.0 for
-  #   # positions we want to attend and -10000.0 for masked positions.
-  #   # adder = (1.0 - tf.cast(attention_mask, tf.float32)) * -10000.0
-  #   adder = (1.0 - attention_mask) * -10000.0
+    # Since attention_mask is 1.0 for positions we want to attend and 0.0 for
+    # masked positions, this operation will create a tensor which is 0.0 for
+    # positions we want to attend and -10000.0 for masked positions.
+    # adder = (1.0 - tf.cast(attention_mask, tf.float32)) * -10000.0
+    adder = (1.0 - attention_mask) * -10000.0
 
-  #   # Since we are adding it to the raw scores before the softmax, this is
-  #   # effectively the same as removing these entirely.
-  #   attention_scores += adder
+    # Since we are adding it to the raw scores before the softmax, this is
+    # effectively the same as removing these entirely.
+    attention_scores += adder
     
-
   # Normalize the attention scores to probabilities.
   # `attention_probs` = [B, N, F, T]
   attention_probs = tf.nn.softmax(attention_scores)

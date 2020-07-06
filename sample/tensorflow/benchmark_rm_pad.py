@@ -18,6 +18,7 @@ import modeling_rm_pad as modeling
 import numpy as np
 import os
 import tensorflow.compat.v1 as tf
+import tensorflow as tfv2
 
 tf.disable_eager_execution()
 
@@ -36,6 +37,8 @@ def main(args):
   max_seq_len = args.max_seq_length
   real_max_seq_len = args.real_max_seq_length
   tf_dtype = tf.float16 if args.precision =='fp16' else tf.float32
+  if args.precision =='fp16':
+    tfv2.keras.backend.set_floatx('float16')
 
   # fake input array length
   input_len = np.random.randint(
@@ -90,24 +93,9 @@ def main(args):
 
     def time_inference(output_tensor) :
       iter_num = 128
-
-      ########
-      input_len = np.random.randint(
-        low = 2 * avg_seq_len - real_max_seq_len, high = real_max_seq_len + 1, 
-        size = (batch_size), dtype = np.int32)
-      index = []
-      for b_idx, s_len in enumerate(input_len) :
-        tmp = [b_idx * max_seq_len + x for x in range(s_len)]
-        index.extend(tmp)
-      index = np.array(index).astype(np.int32)
-
-      input_mask = np.zeros((batch_size, max_seq_len), dtype = np.float16)
-      for b_idx, s_len in enumerate(input_len) :
-        input_mask[b_idx][:s_len] = 1
-      att_mask = np.tile(input_mask, max_seq_len)
-      att_mask = att_mask.reshape(batch_size, max_seq_len, max_seq_len)
-      #########
-
+      nonlocal embed_output
+      nonlocal index
+      nonlocal att_mask
       # warm up
       for i in range(10):
         sess.run(output_tensor, feed_dict={input_tensor: embed_output, index_tensor: index, attention_mask: att_mask})

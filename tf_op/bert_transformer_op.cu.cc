@@ -31,7 +31,7 @@ using namespace effectivetransformer;
 namespace functor
 {
 template <typename T>
-struct BertTransformerOpFunctor<GPUDevice, T>
+struct EffectiveTransformerOpFunctor<GPUDevice, T>
 {
   typedef typename TransformerTFTraits<T>::DataType DataType_;
   static Status Compute(OpKernelContext *context,
@@ -259,12 +259,12 @@ struct BertTransformerOpFunctor<GPUDevice, T>
   }
 };
 
-template struct functor::BertTransformerOpFunctor<GPUDevice, float>;
-template struct functor::BertTransformerOpFunctor<GPUDevice, Eigen::half>;
+template struct functor::EffectiveTransformerOpFunctor<GPUDevice, float>;
+template struct functor::EffectiveTransformerOpFunctor<GPUDevice, Eigen::half>;
 
 /// ************************* Transformer input parser *************************
 template <typename T>
-struct BertTransformerInputOpFunctor<GPUDevice, T>
+struct EffectiveTransformerInputOpFunctor<GPUDevice, T>
 {
   typedef typename TransformerTFTraits<T>::DataType DataType_;
   static Status Compute(OpKernelContext *context,
@@ -330,14 +330,14 @@ struct BertTransformerInputOpFunctor<GPUDevice, T>
   }
 };
 
-template struct functor::BertTransformerInputOpFunctor<GPUDevice, float>;
-template struct functor::BertTransformerInputOpFunctor<GPUDevice, Eigen::half>;
+template struct functor::EffectiveTransformerInputOpFunctor<GPUDevice, float>;
+template struct functor::EffectiveTransformerInputOpFunctor<GPUDevice, Eigen::half>;
 
 
 
 /// ************************* Transformer output parser *************************
 template <typename T>
-struct BertTransformerOutputOpFunctor<GPUDevice, T>
+struct EffectiveTransformerOutputOpFunctor<GPUDevice, T>
 {
   typedef typename TransformerTFTraits<T>::DataType DataType_;
   static Status Compute(OpKernelContext *context,
@@ -371,8 +371,8 @@ struct BertTransformerOutputOpFunctor<GPUDevice, T>
     }
   }
 };
-template struct functor::BertTransformerOutputOpFunctor<GPUDevice, float>;
-template struct functor::BertTransformerOutputOpFunctor<GPUDevice, Eigen::half>;
+template struct functor::EffectiveTransformerOutputOpFunctor<GPUDevice, float>;
+template struct functor::EffectiveTransformerOutputOpFunctor<GPUDevice, Eigen::half>;
 
 } //namespace functor
 

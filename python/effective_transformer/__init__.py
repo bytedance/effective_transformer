@@ -40,14 +40,14 @@ def get_sequence_output(
 
     # 1. rm padding
     comp_from_tensor, valid_word_num_tensor, batch_idx_tensor, word_idx_tensor = \
-        transformer_op_module.bert_transformer_input(from_tensor, input_mask,
+        transformer_op_module.effective_transformer_input(from_tensor, input_mask,
                                                      batch_size=batch_size, from_seq_len=seq_len, to_seq_len=seq_len,
                                                      head_num=head_num, size_per_head=size_per_head)
 
     # 2. transformer loop
     for layer_idx in range(num_layers):
         offset = layer_idx * 16
-        comp_from_tensor = transformer_op_module.bert_transformer(
+        comp_from_tensor = transformer_op_module.effective_transformer(
             comp_from_tensor,
             comp_from_tensor,
             attention_mask,
@@ -76,7 +76,7 @@ def get_sequence_output(
             head_num=head_num, size_per_head=size_per_head)
 
     # . 3. pad back
-    transformer_output = transformer_op_module.bert_transformer_output(
+    transformer_output = transformer_op_module.effective_transformer_output(
         comp_from_tensor, valid_word_num_tensor, batch_idx_tensor, word_idx_tensor,
         batch_size=batch_size, from_seq_len=seq_len, to_seq_len=seq_len,
         head_num=head_num, size_per_head=size_per_head)

@@ -30,7 +30,7 @@ using namespace effectivetransformer;
 namespace tensorflow
 {
   template <typename T> class TransformerTFTraits;
-  
+
   template <>
   class TransformerTFTraits<float>
   {
@@ -50,15 +50,15 @@ namespace tensorflow
   class TransformerParam {
     public:
       int batch_size_;
-      int from_seq_len_; 
+      int from_seq_len_;
       int to_seq_len_;   /// now only support from_seq_len_ == to_seq_len_
-      int head_num_; 
+      int head_num_;
       int size_per_head_;
-      
-      TransformerParam(int batch_size, int from_seq_len, 
-                       int to_seq_len,  int head_num, int size_per_head) 
+
+      TransformerParam(int batch_size, int from_seq_len,
+                       int to_seq_len,  int head_num, int size_per_head)
         : batch_size_(batch_size), from_seq_len_(from_seq_len),
-          to_seq_len_(to_seq_len), head_num_(head_num), size_per_head_(size_per_head) 
+          to_seq_len_(to_seq_len), head_num_(head_num), size_per_head_(size_per_head)
       {
       }
   };
@@ -105,7 +105,7 @@ namespace tensorflow
       int* word_idx;
       int batch_size_;
       int from_seq_len_;
-      int head_num_; 
+      int head_num_;
       int size_per_head_;
       T* to_tensor;
       cudaStream_t stream;
@@ -121,7 +121,7 @@ namespace tensorflow
       const int* word_idx;
       int batch_size_;
       int from_seq_len_;
-      int head_num_; 
+      int head_num_;
       int size_per_head_;
       T* to_tensor;
       cudaStream_t stream;
@@ -132,7 +132,7 @@ namespace tensorflow
   {
     /// ***************************** Transformer op ******************************
     template <typename Device, typename T>
-    struct BertTransformerOpFunctor
+    struct EffectiveTransformerOpFunctor
     {
       typedef typename TransformerTFTraits<T>::DataType DataType_;
       static Status Compute(OpKernelContext *context,
@@ -142,7 +142,7 @@ namespace tensorflow
 
     /// ************************* Transformer input parser *************************
     template <typename Device, typename T>
-    struct BertTransformerInputOpFunctor
+    struct EffectiveTransformerInputOpFunctor
     {
       typedef typename TransformerTFTraits<T>::DataType DataType_;
       static Status Compute(OpKernelContext *context,
@@ -151,7 +151,7 @@ namespace tensorflow
 
     /// ************************* Transformer output parser *************************
     template <typename Device, typename T>
-    struct BertTransformerOutputOpFunctor
+    struct EffectiveTransformerOutputOpFunctor
     {
       typedef typename TransformerTFTraits<T>::DataType DataType_;
       static Status Compute(OpKernelContext *context,

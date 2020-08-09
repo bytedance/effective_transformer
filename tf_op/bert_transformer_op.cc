@@ -41,7 +41,7 @@ void show_shape(Tensor tensor)
 using CPUDevice = Eigen::ThreadPoolDevice;
 using GPUDevice = Eigen::GpuDevice;
 
-REGISTER_OP("BertTransformer")
+REGISTER_OP("EffectiveTransformer")
   .Input("from_tensor: T")
   .Input("to_tensor: T")
   .Input("attr_mask: T")
@@ -76,7 +76,7 @@ REGISTER_OP("BertTransformer")
       return Status::OK();
   });
 template <typename Device, typename T>
-class BertTransformerOp : public OpKernel
+class EffectiveTransformerOp : public OpKernel
 {
   public:
     const T* get_param_from_attr(OpKernelConstruction *context, std::string attr_name) {
@@ -102,7 +102,7 @@ class BertTransformerOp : public OpKernel
       // std::cout << attr_tensor.DeviceSafeDebugString() << std::endl;
     }
 
-    explicit BertTransformerOp(OpKernelConstruction *context) : OpKernel(context)
+    explicit EffectiveTransformerOp(OpKernelConstruction *context) : OpKernel(context)
     {
       OP_REQUIRES_OK(context, context->GetAttr("batch_size", &batch_size_));
       OP_REQUIRES_OK(context, context->GetAttr("from_seq_len", &from_seq_len_));
@@ -214,7 +214,7 @@ class BertTransformerOp : public OpKernel
 
       OP_REQUIRES_OK(
           context,
-          functor::BertTransformerOpFunctor<Device, T>::Compute(
+          functor::EffectiveTransformerOpFunctor<Device, T>::Compute(
             context,
             param,
             tsfp));
@@ -234,8 +234,8 @@ class BertTransformerOp : public OpKernel
 
 #define REGISTER_GPU(T)                                                                       \
     REGISTER_KERNEL_BUILDER(                                                                  \
-        Name("BertTransformer").Device(DEVICE_GPU).TypeConstraint<T>("T"), \
-        BertTransformerOp<GPUDevice, T>)
+        Name("EffectiveTransformer").Device(DEVICE_GPU).TypeConstraint<T>("T"), \
+        EffectiveTransformerOp<GPUDevice, T>)
 REGISTER_GPU(float);
 REGISTER_GPU(Eigen::half);
 #undef REGISTER_GPU
@@ -246,7 +246,7 @@ REGISTER_GPU(Eigen::half);
 using CPUDevice = Eigen::ThreadPoolDevice;
 using GPUDevice = Eigen::GpuDevice;
 
-REGISTER_OP("BertTransformerInput")
+REGISTER_OP("EffectiveTransformerInput")
   .Input("from_tensor: T")
   .Input("mask: int32")
   .Output("to_tensor: T")
@@ -274,10 +274,10 @@ REGISTER_OP("BertTransformerInput")
       });
 
 template <typename Device, typename T>
-class BertTransformerInputOp : public OpKernel
+class EffectiveTransformerInputOp : public OpKernel
 {
   public:
-    explicit BertTransformerInputOp(OpKernelConstruction *context) : OpKernel(context)
+    explicit EffectiveTransformerInputOp(OpKernelConstruction *context) : OpKernel(context)
     {
       OP_REQUIRES_OK(context, context->GetAttr("batch_size", &batch_size_));
       OP_REQUIRES_OK(context, context->GetAttr("from_seq_len", &from_seq_len_));
@@ -334,7 +334,7 @@ class BertTransformerInputOp : public OpKernel
       param.size_per_head_ = size_per_head_;
       OP_REQUIRES_OK(
           context,
-          functor::BertTransformerInputOpFunctor<Device, T>::Compute(
+          functor::EffectiveTransformerInputOpFunctor<Device, T>::Compute(
             context,
             param));
     }
@@ -346,17 +346,17 @@ class BertTransformerInputOp : public OpKernel
 
 #ifdef GOOGLE_CUDA
 #define REGISTER_GPU(T)                                       \
-REGISTER_KERNEL_BUILDER(Name("BertTransformerInput")          \
+REGISTER_KERNEL_BUILDER(Name("EffectiveTransformerInput")          \
                             .Device(DEVICE_GPU)               \
                             .TypeConstraint<T>("T"),          \
-                        BertTransformerInputOp<GPUDevice, T>);
+                        EffectiveTransformerInputOp<GPUDevice, T>);
 REGISTER_GPU(float);
 REGISTER_GPU(Eigen::half);
 #undef REGISTER_GPU
 #endif
 
 /// ************************* Transformer output parser *************************
-REGISTER_OP("BertTransformerOutput")
+REGISTER_OP("EffectiveTransformerOutput")
   .Input("from_tensor: T")
   .Input("valid_word_num: int32")
   .Input("batch_idx: int32")
@@ -380,10 +380,10 @@ REGISTER_OP("BertTransformerOutput")
       });
 
 template <typename Device, typename T>
-class BertTransformerOutputOp : public OpKernel
+class EffectiveTransformerOutputOp : public OpKernel
 {
   public:
-    explicit BertTransformerOutputOp(OpKernelConstruction *context) : OpKernel(context)
+    explicit EffectiveTransformerOutputOp(OpKernelConstruction *context) : OpKernel(context)
     {
       OP_REQUIRES_OK(context, context->GetAttr("batch_size", &batch_size_));
       OP_REQUIRES_OK(context, context->GetAttr("from_seq_len", &from_seq_len_));
@@ -425,7 +425,7 @@ class BertTransformerOutputOp : public OpKernel
       param.size_per_head_ = size_per_head_;
       OP_REQUIRES_OK(
           context,
-          functor::BertTransformerOutputOpFunctor<Device, T>::Compute(
+          functor::EffectiveTransformerOutputOpFunctor<Device, T>::Compute(
             context,
             param));
     }
@@ -437,10 +437,10 @@ class BertTransformerOutputOp : public OpKernel
 
 #ifdef GOOGLE_CUDA
 #define REGISTER_GPU(T)                                        \
-REGISTER_KERNEL_BUILDER(Name("BertTransformerOutput")          \
+REGISTER_KERNEL_BUILDER(Name("EffectiveTransformerOutput")          \
                             .Device(DEVICE_GPU)                \
                             .TypeConstraint<T>("T"),           \
-                        BertTransformerOutputOp<GPUDevice, T>);
+                        EffectiveTransformerOutputOp<GPUDevice, T>);
 REGISTER_GPU(float);
 REGISTER_GPU(Eigen::half);
 #undef REGISTER_GPU

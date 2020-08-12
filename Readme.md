@@ -142,3 +142,6 @@ $ cmake -DTF_PATH=/your/path/to/pythonx.x/site-packages/tensorflow_core/ ..
 $ make
 $ cp lib/libtf_effectivetransformer.so ../python/effective_transformer/libtf_effectivetransformer.so.1.15
 ```
+
+## How to use
+* [Tensorflow examples](https://github.com/bytedance/effective_transformer/tree/master/sample/tensorflow)

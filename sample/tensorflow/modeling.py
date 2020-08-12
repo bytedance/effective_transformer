@@ -382,7 +382,8 @@ def embedding_lookup(input_ids,
                      embedding_size=128,
                      initializer_range=0.02,
                      word_embedding_name="word_embeddings",
-                     use_one_hot_embeddings=False):
+                     use_one_hot_embeddings=False,
+                     tf_dtype=tf.float32):
   """Looks up words embeddings for id tensor.
 
   Args:
@@ -394,6 +395,7 @@ def embedding_lookup(input_ids,
     word_embedding_name: string. Name of the embedding table.
     use_one_hot_embeddings: bool. If True, use one-hot method for word
       embeddings. If False, use `tf.gather()`.
+    tf_dtype: tf.float32 or tf.float16.
 
   Returns:
     float Tensor of shape [batch_size, seq_length, embedding_size].
@@ -409,7 +411,9 @@ def embedding_lookup(input_ids,
   embedding_table = tf.get_variable(
       name=word_embedding_name,
       shape=[vocab_size, embedding_size],
-      initializer=create_initializer(initializer_range))
+      initializer=create_initializer(initializer_range),
+      dtype=tf_dtype
+  )
 
   flat_input_ids = tf.reshape(input_ids, [-1])
   if use_one_hot_embeddings:
@@ -434,7 +438,8 @@ def embedding_postprocessor(input_tensor,
                             position_embedding_name="position_embeddings",
                             initializer_range=0.02,
                             max_position_embeddings=512,
-                            dropout_prob=0.1):
+                            dropout_prob=0.1,
+                            tf_dtype=tf.float32):
   """Performs various post-processing on a word embedding tensor.
 
   Args:
@@ -455,6 +460,7 @@ def embedding_postprocessor(input_tensor,
       used with this model. This can be longer than the sequence length of
       input_tensor, but cannot be shorter.
     dropout_prob: float. Dropout probability applied to the final output tensor.
+    tf_dtype: tf.float32 or tf.float16.
 
   Returns:
     float tensor with same shape as `input_tensor`.
@@ -476,11 +482,13 @@ def embedding_postprocessor(input_tensor,
     token_type_table = tf.get_variable(
         name=token_type_embedding_name,
         shape=[token_type_vocab_size, width],
-        initializer=create_initializer(initializer_range))
+        initializer=create_initializer(initializer_range),
+        dtype=tf_dtype
+    )
     # This vocab will be small so we always do one-hot here, since it is always
     # faster for a small vocabulary.
     flat_token_type_ids = tf.reshape(token_type_ids, [-1])
-    one_hot_ids = tf.one_hot(flat_token_type_ids, depth=token_type_vocab_size)
+    one_hot_ids = tf.one_hot(flat_token_type_ids, depth=token_type_vocab_size, dtype=tf_dtype)
     token_type_embeddings = tf.matmul(one_hot_ids, token_type_table)
     token_type_embeddings = tf.reshape(token_type_embeddings,
                                        [batch_size, seq_length, width])
@@ -492,7 +500,9 @@ def embedding_postprocessor(input_tensor,
       full_position_embeddings = tf.get_variable(
           name=position_embedding_name,
           shape=[max_position_embeddings, width],
-          initializer=create_initializer(initializer_range))
+          initializer=create_initializer(initializer_range),
+          dtype=tf_dtype
+      )
       # Since the position embedding table is a learned variable, we create it
       # using a (long) sequence length `max_position_embeddings`. The actual
       # sequence length might be shorter than this, for faster training of
@@ -521,12 +531,13 @@ def embedding_postprocessor(input_tensor,
   return output
 
 
-def create_attention_mask_from_input_mask(from_tensor, to_mask):
+def create_attention_mask_from_input_mask(from_tensor, to_mask, tf_dtype=tf.float32):
   """Create 3D attention mask from a 2D tensor mask.
 
   Args:
     from_tensor: 2D or 3D Tensor of shape [batch_size, from_seq_length, ...].
     to_mask: int32 Tensor of shape [batch_size, to_seq_length].
+    tf_dtype: tf.float32 or tf.float16.
 
   Returns:
     float Tensor of shape [batch_size, from_seq_length, to_seq_length].
@@ -539,7 +550,7 @@ def create_attention_mask_from_input_mask(from_tensor, to_mask):
   to_seq_length = to_shape[1]
 
   to_mask = tf.cast(
-      tf.reshape(to_mask, [batch_size, 1, to_seq_length]), tf.float32)
+      tf.reshape(to_mask, [batch_size, 1, to_seq_length]), tf_dtype)
 
   # We don't assume that `from_tensor` is a mask (although it could be). We
   # don't actually care if we attend *from* padding tokens (only *to* padding)
@@ -547,7 +558,7 @@ def create_attention_mask_from_input_mask(from_tensor, to_mask):
   #
   # `broadcast_ones` = [batch_size, from_seq_length, 1]
   broadcast_ones = tf.ones(
-      shape=[batch_size, from_seq_length, 1], dtype=tf.float32)
+      shape=[batch_size, from_seq_length, 1], dtype=tf_dtype)
 
   # Here we broadcast along two dimensions to create the mask.
   mask = broadcast_ones * to_mask

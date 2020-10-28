@@ -18,6 +18,8 @@ import modeling
 import numpy as np
 import os
 import tensorflow as tf
+import sys
+sys.path.insert(0, '../../python')
 import effective_transformer
 
 # disable tensorflow debugging information

@@ -568,7 +568,8 @@ def attention_layer(from_tensor,
                     do_return_2d_tensor=False,
                     batch_size=None,
                     from_seq_length=None,
-                    to_seq_length=None):
+                    to_seq_length=None,
+                    use_pad_rm=False):
   """Performs multi-headed attention from `from_tensor` to `to_tensor`.
 
   This is an implementation of multi-headed attention based on "Attention
@@ -662,6 +663,20 @@ def attention_layer(from_tensor,
   from_tensor_2d = reshape_to_matrix(from_tensor)
   to_tensor_2d = reshape_to_matrix(to_tensor)
 
+  if use_pad_rm and attention_mask is not None:
+    input_mask = attention_mask[:, 0, :]
+    pad_mask = tf.reshape(input_mask, [-1])
+    nonpad_ids = tf.cast(tf.where(pad_mask > 1e-6), tf.int32)
+    dim_origin = tf.shape(pad_mask)[:1]
+
+    from_tensor_2d_shape = from_tensor_2d.get_shape().as_list()
+    from_tensor_2d = tf.gather_nd(from_tensor_2d, indices=nonpad_ids)
+    from_tensor_2d.set_shape([None] + from_tensor_2d_shape[1:])
+
+    to_tensor_2d_shape = to_tensor_2d.get_shape().as_list()
+    to_tensor_2d = tf.gather_nd(to_tensor_2d, indices=nonpad_ids)
+    to_tensor_2d.set_shape([None] + to_tensor_2d_shape[1:])
+
   # `query_layer` = [B*F, N*H]
   query_layer = tf.layers.dense(
       from_tensor_2d,
@@ -685,6 +700,20 @@ def attention_layer(from_tensor,
       activation=value_act,
       name="value",
       kernel_initializer=create_initializer(initializer_range))
+
+  if use_pad_rm and attention_mask is not None:
+    query_layer = tf.scatter_nd(
+      indices=nonpad_ids,
+      updates=query_layer,
+      shape=tf.concat([dim_origin, tf.shape(query_layer)[1:]], axis=0))
+    key_layer = tf.scatter_nd(
+      indices=nonpad_ids,
+      updates=key_layer,
+      shape=tf.concat([dim_origin, tf.shape(key_layer)[1:]], axis=0))
+    value_layer = tf.scatter_nd(
+      indices=nonpad_ids,
+      updates=value_layer,
+      shape=tf.concat([dim_origin, tf.shape(value_layer)[1:]], axis=0))
 
   # `query_layer` = [B, N, F, H]
   query_layer = transpose_for_scores(query_layer, batch_size,
@@ -762,7 +791,8 @@ def transformer_model(input_tensor,
                       hidden_dropout_prob=0.1,
                       attention_probs_dropout_prob=0.1,
                       initializer_range=0.02,
-                      do_return_all_layers=False):
+                      do_return_all_layers=False,
+                      use_pad_rm=False):
   """Multi-headed, multi-layer Transformer from "Attention is All You Need".
 
   This is almost an exact implementation of the original Transformer encoder.
@@ -842,7 +872,8 @@ def transformer_model(input_tensor,
               do_return_2d_tensor=True,
               batch_size=batch_size,
               from_seq_length=seq_length,
-              to_seq_length=seq_length)
+              to_seq_length=seq_length,
+              use_pad_rm=use_pad_rm)
           attention_heads.append(attention_head)
 
         attention_output = None
@@ -852,6 +883,19 @@ def transformer_model(input_tensor,
           # In the case where we have other sequences, we just concatenate
           # them to the self-attention head before the projection.
           attention_output = tf.concat(attention_heads, axis=-1)
+
+        if use_pad_rm and attention_mask is not None:
+          input_mask = attention_mask[:, 0, :]
+          pad_mask = tf.reshape(input_mask, [-1])
+          nonpad_ids = tf.cast(tf.where(pad_mask > 1e-6), tf.int32)
+          dim_origin = tf.shape(pad_mask)[:1]
+          attention_output_shape = attention_output.get_shape().as_list()
+          attention_output = tf.gather_nd(attention_output, indices=nonpad_ids)
+          attention_output.set_shape([None] + attention_output_shape[1:])
+
+          layer_input_shape = layer_input.get_shape().as_list()
+          layer_input = tf.gather_nd(layer_input, indices=nonpad_ids)
+          layer_input.set_shape([None] + layer_input_shape[1:])
 
         # Run a linear projection of `hidden_size` then add a residual
         # with `layer_input`.
@@ -879,6 +923,13 @@ def transformer_model(input_tensor,
             kernel_initializer=create_initializer(initializer_range))
         layer_output = dropout(layer_output, hidden_dropout_prob)
         layer_output = layer_norm(layer_output + attention_output)
+
+        if use_pad_rm and attention_mask is not None:
+          layer_output = tf.scatter_nd(
+            indices=nonpad_ids,
+            updates=layer_output,
+            shape=tf.concat([dim_origin, tf.shape(layer_output)[1:]], axis=0))
+
         prev_output = layer_output
         all_layer_outputs.append(layer_output)
 

@@ -21,7 +21,7 @@ import tensorflow as tf
 import effective_transformer
 
 # disable tensorflow debugging information
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 def main(args):
@@ -36,13 +36,13 @@ def main(args):
 
   # fake input array length
   input_len = np.random.randint(
-    low = 2 * avg_seq_len - max_seq_len, high = max_seq_len + 1, 
+    low = 2 * avg_seq_len - max_seq_len, high = max_seq_len + 1,
     size = (batch_size), dtype = np.int32)
   valid_word_num = sum(input_len)
 
   # fake input id and mask
   input_ids  = np.random.randint(
-    low = 0, high = bert_config.vocab_size, 
+    low = 0, high = bert_config.vocab_size,
     size = (batch_size, max_seq_len), dtype = np.int32)
   input_mask = np.zeros((batch_size, max_seq_len), dtype = np.int32)
   for b_idx, s_len in enumerate(input_len) :
@@ -51,7 +51,7 @@ def main(args):
   input_ids_tensor  = tf.convert_to_tensor(input_ids,  dtype = tf.int32)
   input_mask_tensor = tf.convert_to_tensor(input_mask, dtype = tf.int32)
 
-  # fake embedding output 
+  # fake embedding output
   embed_output = np.random.randn(batch_size, max_seq_len, bert_config.hidden_size)
   input_tensor = tf.convert_to_tensor(embed_output, dtype = tf_dtype)
 
@@ -77,10 +77,12 @@ def main(args):
     hidden_dropout_prob          = bert_config.hidden_dropout_prob,
     attention_probs_dropout_prob = bert_config.attention_probs_dropout_prob,
     initializer_range            = bert_config.initializer_range,
-    do_return_all_layers         = False)
+    do_return_all_layers         = False,
+    use_pad_rm                   = True,
+  )
 
   config = tf.ConfigProto()
-  config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
+  # config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
   with tf.Session(config=config) as sess:
     # init weights
     sess.run(tf.global_variables_initializer())
@@ -114,9 +116,9 @@ def main(args):
     def time_inference(output_tensor) :
       iter_num = 128
       # warm up
-      for i in range(10) : 
+      for i in range(10) :
         sess.run(output_tensor)
-      
+
       beg = datetime.now()
       for i in range(iter_num):
         sess.run(output_tensor)

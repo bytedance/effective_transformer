@@ -14,6 +14,7 @@
 
 import os
 import tensorflow as tf
+import warnings
 
 __lib_tf_1_15 = os.path.join(os.path.dirname(
     os.path.abspath(__file__)), "libtf_effectivetransformer.so.1.15")
@@ -80,5 +81,4 @@ def get_sequence_output(
         comp_from_tensor, valid_word_num_tensor, batch_idx_tensor, word_idx_tensor,
         batch_size=batch_size, from_seq_len=seq_len, to_seq_len=seq_len,
         head_num=head_num, size_per_head=size_per_head)
-
     return transformer_output

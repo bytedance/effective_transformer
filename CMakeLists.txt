@@ -53,7 +53,7 @@ foreach(arch ${GPU_ARCHS})
 endforeach()
 message(STATUS "gencode      : " ${GENCODES})
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_C_FLAGS    "${CMAKE_C_FLAGS} -DWMMA -O3")

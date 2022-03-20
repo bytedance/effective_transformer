@@ -24,6 +24,8 @@ import effective_transformer
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
+tf.compat.v1.disable_eager_execution()
+
 def main(args):
   bert_config = modeling.BertConfig.from_json_file(args.config)
   bert_config.hidden_dropout_prob = 0.0
@@ -33,6 +35,10 @@ def main(args):
   avg_seq_len = args.avg_seq_length
   max_seq_len = args.max_seq_length
   tf_dtype = tf.float16 if args.precision =='fp16' else tf.float32
+
+  if args.precision == 'fp16':
+    policy = tf.keras.mixed_precision.Policy('mixed_float16')
+    tf.keras.mixed_precision.set_global_policy(policy)
 
   # fake input array length
   input_len = np.random.randint(
@@ -79,15 +85,15 @@ def main(args):
     initializer_range            = bert_config.initializer_range,
     do_return_all_layers         = False)
 
-  config = tf.ConfigProto()
-  config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
-  with tf.Session(config=config) as sess:
+  config = tf.compat.v1.ConfigProto()
+  config.graph_options.optimizer_options.global_jit_level = tf.compat.v1.OptimizerOptions.ON_1
+  with tf.compat.v1.Session(config=config) as sess:
     # init weights
-    sess.run(tf.global_variables_initializer())
+    sess.run(tf.compat.v1.global_variables_initializer())
 
     # get transformer weights
-    all_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-    transformer_vars = [v for v in all_vars if v.name.startswith('layer')]
+    all_vars = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES)
+    transformer_vars = [tf.cast(v, dtype=tf_dtype) for v in all_vars if v.name.startswith('layer')]
     weights_value = sess.run(transformer_vars)
 
     # bert with effective transformer
